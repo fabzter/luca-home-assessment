@@ -129,3 +129,95 @@ Separé el sistema en **tres paths de ejecución** basándome en sus perfiles de
 **Observabilidad:** CloudWatch centraliza logs estructurados (JSON) con correlation IDs que permiten seguir una transacción completa a través de todos los componentes. X-Ray provee trazabilidad distribuida para análisis de latencia y debugging.
 
 **Data Pipeline:** DynamoDB Streams captura todos los cambios en la base de datos. EventBridge Pipes filtra y transforma los eventos antes de enviarlos a Kinesis Firehose, que los archiva en S3 en formato Parquet para auditoría y análisis posterior—sin escribir código ETL custom.
+
+## 4. Casos de Uso Detallados
+
+### 4.1 Notas Centralizadas
+
+El sistema de calificaciones debe soportar reglas configurables por tenant (cada escuela define cómo consolidar notas). La arquitectura refleja esto separando datos (notas raw) de lógica (reglas de cálculo).
+
+**Modelo de Datos:**
+
+Uso un diseño single table en DynamoDB con partition key compuesta que garantiza aislamiento multi-tenant:
+
+```
+PK: TENANT#school_123#STUDENT#student_456
+SK: GRADE#matematicas#Q1_2024
+
+Attributes:
+- raw_scores: [85, 90, 78]  // evaluaciones individuales
+- consolidated: 84.3        // nota calculada
+- version: 5                // para optimistic locking
+- last_updated: timestamp
+- updated_by: teacher_id
+```
+
+Las reglas de consolidación se almacenan en un item separado por tenant:
+
+```
+PK: TENANT#school_123#CONFIG
+SK: GRADING_RULES
+
+Attributes:
+- rules: {
+    "matematicas": {
+      "weights": {"exams": 0.7, "homework": 0.3},
+      "min_passing": 60,
+      "rounding": "nearest"
+    }
+  }
+```
+
+**Aislamiento Multi-Tenant:**
+
+La seguridad entre escuelas se garantiza a nivel IAM, no solo en código. Cuando un profesor se autentica, recibe un JWT con claim `school_id`. App Runner asume un rol IAM dinámicamente con esta política:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"],
+  "Resource": "arn:aws:dynamodb:*:table/luca-platform",
+  "Condition": {
+    "ForAllValues:StringLike": {
+      "dynamodb:LeadingKeys": ["TENANT#${aws:PrincipalTag/school_id}#*"]
+    }
+  }
+}
+```
+
+Esta política fuerza que **todas** las operaciones a DynamoDB solo puedan acceder items cuyo partition key empiece con `TENANT#school_123#`. Incluso si hay un bug en el código que olvida filtrar por tenant, AWS rechazará la query. Esto es crítico para compliance con datos de menores.
+
+**Flujo de Cálculo:**
+
+```mermaid
+flowchart LR
+    Teacher[Profesor] -->|"POST /grades"| APIG[API Gateway]
+    APIG --> AppRunner["App Runner<br/>(Calculation Engine)"]
+    
+    AppRunner -->|"1. Read Rules"| Cache[("Config Cache<br/>(in Memory)")]
+    AppRunner -->|"2. Read Current Grades"| DDB[("DynamoDB")]
+    
+    AppRunner -->|"3. Calculate & Write<br/>with Version Check"| DDB
+    
+    DDB -->|Success| AppRunner
+    AppRunner -->|"200 OK"| APIG
+    APIG -->|Response| Teacher
+    
+    DDB -.->|"Version Mismatch"| AppRunner
+    AppRunner -.->|"409 Conflict"| APIG
+    APIG -.->|"Error Response"| Teacher
+    
+    classDef compute fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef data fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    
+    class AppRunner compute
+    class DDB,Cache data
+```
+
+**Decisiones Clave:**
+
+- **Reglas en caché:** App Runner carga las reglas de tenant al inicio y las mantiene en memoria. Esto elimina un round-trip a DynamoDB en cada cálculo, garantizando el target de latencia <120ms.
+
+- **Optimistic Locking:** El campo `version` previene race conditions cuando dos profesores editan la misma nota simultáneamente. Si hay conflicto de versión, DynamoDB rechaza la escritura y App Runner retorna `409 Conflict` al cliente. El frontend maneja el error mostrando al usuario que debe refrescar y reintentar.
+
+- **Configurabilidad:** Cada tenant define sus propias fórmulas sin cambios en código. Agregar un nuevo tipo de cálculo (ej. "curva de campana") es solo actualizar el config item, sin deploys.
