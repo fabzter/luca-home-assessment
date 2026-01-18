@@ -49,6 +49,11 @@ flowchart TB
         StepFunctions["AWS Step Functions"]
     end
 
+    subgraph BackgroundJob ["Background: Consolidación"]
+        NightlyScheduler["EventBridge<br/>(Nightly 02:00)"]
+        ConsolidatorLambda["Lambda<br/>(Grade Consolidator)"]
+    end
+
     %% === PERSISTENCE LAYER ===
     subgraph PersistenceLayer ["Persistence"]
         DynamoDB[("DynamoDB<br/>Single Table<br/>⚠️ Multi-Tenant: IAM Isolation")]
@@ -76,7 +81,7 @@ flowchart TB
     WAF --> APIG
 
     %% Path 1: Interactive
-    APIG -->|"/grades, /profile"| AppRunner
+    APIG -->|"/evaluations, /profile"| AppRunner
     AppRunner --> DynamoDB
 
     %% Path 2: High Volume
@@ -89,6 +94,10 @@ flowchart TB
     StepFunctions --> DynamoDB
     StepFunctions <-->|"HTTP Retry"| GovSystem
 
+    %% Background Consolidation
+    NightlyScheduler -->|Trigger| ConsolidatorLambda
+    ConsolidatorLambda -->|"Calculate grades<br/>by period"| DynamoDB
+
     %% Data Pipeline Connection
     DynamoDB -.-> Streams
 
@@ -97,6 +106,7 @@ flowchart TB
     Path1 -.-> ObsLayer
     Path2 -.-> ObsLayer
     Path3 -.-> ObsLayer
+    BackgroundJob -.-> ObsLayer
 
     %% Styling
     classDef edge fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
@@ -107,7 +117,7 @@ flowchart TB
     classDef external fill:#eceff1,stroke:#37474f,stroke-width:2px
 
     class WAF,APIG,EdgeLayer edge
-    class AppRunner,Lambda,SQS,Scheduler,StepFunctions,Path1,Path2,Path3 compute
+    class AppRunner,Lambda,SQS,Scheduler,StepFunctions,NightlyScheduler,ConsolidatorLambda,Path1,Path2,Path3,BackgroundJob compute
     class DynamoDB,PersistenceLayer data
     class Streams,Pipes,Firehose,S3,DataPipeline pipeline
     class CloudWatch,XRay,ObsLayer obs
@@ -116,13 +126,15 @@ flowchart TB
 
 ### Estrategia de Separación de Dominios
 
-Separé el sistema en **tres paths de ejecución** basándome en sus perfiles de tráfico y requerimientos de latencia:
+Separé el sistema en **tres paths de ejecución** más un **background job** basándome en sus perfiles de tráfico y requerimientos de latencia:
 
-**Path 1 (Interactivo):** Operaciones síncronas como consulta de perfiles y cálculo de notas. Usé contenedores persistentes (App Runner) en lugar de funciones efímeras para mantener conexiones activas a la base de datos y reglas de negocio cargadas en memoria. Esto elimina cold starts y garantiza latencias estables bajo el target de p95 < 120ms.
+**Path 1 (Interactivo):** Operaciones síncronas como consulta de perfiles y registro de evaluaciones individuales. Usé contenedores persistentes (App Runner) en lugar de funciones efímeras para mantener conexiones activas a la base de datos y configuraciones cargadas en memoria. Esto elimina cold starts y garantiza latencias estables bajo el target de p95 < 120ms. La lectura de perfiles consulta grades pre-calculados, no hace cálculos en tiempo real.
 
 **Path 2 (Alta Velocidad):** Ingesta masiva de eventos de comportamiento estudiantil (~5,000 RPS en picos). API Gateway escribe directamente a SQS sin lambda intermedia, reduciendo costo y latencia. Lambda workers procesan en lotes de 50 mensajes, optimizando escrituras a DynamoDB mediante `BatchWriteItem`. La cola actúa como buffer anti-stampede protegiendo el resto del sistema.
 
 **Path 3 (Sincronización):** Integración con el sistema del gobierno usando Step Functions para manejar la naturaleza inestable del API externo. La máquina de estados coordina reintentos con backoff exponencial, esperas largas sin consumir recursos, y mantiene auditoría completa del proceso de sincronización.
+
+**Background Job (Consolidación):** Lambda corre nocturnamente (02:00 hrs) para calcular notas consolidadas por periodo académico. Aplica las reglas de consolidación configuradas por tenant sobre las evaluaciones individuales registradas durante el día. Esto desacopla la escritura rápida de evaluaciones del costo computacional de aplicar reglas complejas, garantizando que las consultas lean datos pre-calculados.
 
 **Multi-Tenancy:** El aislamiento entre escuelas se garantiza a nivel IAM usando `dynamodb:LeadingKeys` en las políticas de acceso. Esto previene que un tenant acceda datos de otro incluso si existe un bug en la lógica de aplicación—crítico para compliance con datos de menores.
 
