@@ -292,3 +292,65 @@ flowchart LR
 
 ---
 
+## Operación - Métricas y Respuesta a Incidentes
+
+### **Métricas Mínimas por Path**
+
+**Path Interactivo (App Runner):**
+- **Latencia:** p95 < 120ms (SLA crítico)
+- **Error rate:** < 1% requests fallando
+- **Capacity:** CPU/Memory utilization < 80%
+
+**Path Alta Velocidad (SQS → Lambda):**
+- **Queue depth:** SQS messages < 1,000 (anti-stampede)
+- **Lambda throttles:** 0 throttled invocations
+- **DynamoDB throttles:** 0 throttled writes
+
+**Path Gobierno (Step Functions):**
+- **Failed executions:** 0 executions FAILED status
+- **Execution duration:** < 2 horas por sync completa
+- **Dead letter queue:** 0 messages en DLQ
+
+### **Alertas Críticas**
+```
+CRITICAL: p95 latency > 150ms (Path 1)
+CRITICAL: SQS depth > 2,000 messages (Path 2)  
+CRITICAL: Step Function FAILED (Path 3)
+WARNING: Error rate > 0.5%
+WARNING: DynamoDB consumed capacity > 80%
+```
+
+### **Runbook Incidentes**
+
+**📈 High Latency (Path 1):**
+*AWS Path: Cognito → API Gateway → App Runner → DynamoDB*
+1. Check App Runner CPU/Memory → Scale up instances
+2. Check DynamoDB throttling → Review capacity or switch to provisioned
+3. Check downstream dependencies (Cognito, IAM)
+
+**🔥 High Queue Depth (Path 2):**
+*AWS Path: API Gateway → SQS → Lambda → DynamoDB*
+1. Check Lambda errors → Fix code issues
+2. Check DynamoDB throttling → Increase WCU or switch provisioned
+3. Temporary: Scale Lambda concurrency manually
+
+**❌ Government Sync Failed (Path 3):**
+*AWS Path: EventBridge → Step Functions → Lambda → External API*
+1. Check Step Function execution history → Identify failed step
+2. If API timeout → Manual retry after government maintenance
+3. If data validation → Check DLQ, fix data, replay
+
+**🚨 Multi-tenant Data Leak:**
+*AWS Components: IAM Roles/Policies + DynamoDB LeadingKeys (affects all paths)*
+1. STOP: Disable affected IAM role immediately
+2. Check CloudTrail logs for unauthorized access
+3. Audit affected tenants, notify if breach confirmed
+4. Root cause: Review IAM policy, fix, re-deploy
+
+**💾 DynamoDB Issues:**
+*AWS Component: DynamoDB (shared by all 3 paths)*
+1. Check CloudWatch metrics (throttles, errors)
+2. On-demand should auto-scale → Check for hot partitions
+3. If persistent → Consider GSI or data model changes
+
+---
