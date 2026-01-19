@@ -1,11 +1,15 @@
 # Sistema de Evaluaciones Educativas - Diseño de Arquitectura
 
-## Principios y Assumptions
+## Principios de Diseño
 
-**Principios de diseño:**
-- **Defense-in-depth:** Multi-tenant enforcement a nivel IAM, no solo aplicación
-- **Cost-conscious:** Optimizar para workloads esporádicos educativos, no enterprise 24/7
-- **Operational simplicity:** Prefer managed services vs custom infrastructure
+Mi diseño busca ser pragmático. Estas son mis motivaciones para cada decisión:
+
+- **Simplicidad Operativa:** Priorizo productos gestionados (Managed Services) en lugar de gestionar infraestructura propia. Evito Kubernetes o clusters de Kafka. Busco que los equipos se enfoquen en el producto, no en manejar infraestructura.
+- **Serverless, donde haga sentido:** Uso Serverless (Lambda, SQS) para tráfico impredecible y masivo tratando de proteger costos. Uso contenedores en App Runner donde la latencia en *cold start* es crítica, evitando pagar *provisioned concurrency* en Lambda.
+- **Developer Experience:** Busco reducir la complejidad mental del equipo (y la mía) separando ciertos dominios y evitando cadenas de Lambdas difíciles de monitorear, entre otros.
+- **Resiliencia por diseño:** Siempre desarrollo pensando en que las piezas van a fallar.
+- **Compliance y Seguridad:** La protección de datos (PII de menores) y el aislamiento entre escuelas ß(Multi-tenant) se manejan a nivel infraestructura e IAM. Es inaceptable que un tenant vea datos de otro.
+- **Simplicidad:** Trato de no hacer sobre ingeniería, pero dejando margen para iteraciones cercanas.
 
 **Assumptions clave:**
 - **Usuarios:** 50 escuelas, ~5k estudiantes, horario escolar concentrado (8am-4pm)
@@ -254,14 +258,37 @@ flowchart LR
 
 ---
 
-## Trade-offs Arquitectura General
+## Trade-offs por Componente
 
-**3 paths vs monolito:** Operational complexity pero optimización específica por use case  
-**Managed services vs custom:** Menos control pero menos operational overhead  
-**IAM-level security vs app-level:** Más setup pero defense-in-depth garantizado  
+### **Arquitectura General**
+- **Híbrido compute vs uniformidad:** App Runner elimina cold starts para path interactivo (<120ms), Lambda para batch. Todo Lambda requeriría $200/mes provisioned concurrency.
 
-**Números:** $45/mes esta solución vs $120/mes alternativas full-managed.
+### **Base de Datos**  
+- **DynamoDB single table vs PostgreSQL:** Sacrifico JOINs nativos pero gano 10-15ms menos latency + escalamiento instantáneo. Aurora toma 30-45s en escalar durante picos.
+- **On-demand vs provisioned:** Pago por uso real vs capacity planning. Tráfico educativo es spiky (8am-4pm), provisioned sería over o under.
+
+### **Seguridad Multi-tenant**
+- **IAM LeadingKeys vs app-level:** +20ms STS overhead pero garantiza que bug de código no expone datos cross-tenant. Con PII de menores es inaceptable depender solo de WHERE clauses.
+- **Defense-in-depth vs simplicidad:** Más configuración IAM pero auditable a nivel infraestructura para compliance.
+
+### **Integración Gobierno**
+- **Step Functions vs Lambda custom:** $10/año vs $0 pero evito reimplementar retry/backoff/DLQ. API gobierno es inestable, necesito robustez battle-tested.
+- **Visual debugging vs logs:** Workflow states visible en console vs parsear logs. Facilita debugging cuando sync falla.
+
+### **Pipeline de Datos**
+- **EventBridge Pipes vs Lambda processing:** Zero código de mantenimiento vs control total. Filtro y transformación declarativa vs 150+ líneas custom.
+- **Hot/Cold storage vs todo DynamoDB:** Queries <30 días en 10ms vs histórico en S3+Athena 2-5s. Ahorro masivo: $125 vs $13/mes.
+
+### **Ingesta Alta Velocidad**
+- **SQS buffer vs Lambda directo:** Eventual consistency (aceptable para behavior events) vs risk de throttling en 5k RPS spikes.
+- **Batch 50 eventos vs individual:** +2s latency promedio pero 80% cost reduction en DynamoDB writes.
+
+### **Observabilidad**
+- **CloudWatch nativo vs Datadog/ELK:** Features básicos pero integración zero-config + $15/mes vs setup complejo + $200+/mes operational overhead.
+
+**Tema consistente:** Elegir tecnología aburrida que funciona, optimizada para patrones educativos (spiky, cost-sensitive, compliance-critical).
+
+**Total: $45/mes vs $400+/mes alternativas**
 
 ---
 
-*ADRs completos en `/ADR/`, runbooks en `/notes/` para implementation details.*
