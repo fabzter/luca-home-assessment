@@ -4,7 +4,7 @@
 
 ## Contexto y Problema
 
-El sistema maneja datos PII de menores (estudiantes) distribuidos entre múltiples tenants (escuelas). Un bug en la lógica de aplicación que olvide filtrar por `tenant_id` podría exponer datos cross-tenant, lo cual es inaceptable por compliance (GDPR, COPPA equivalentes).
+El sistema maneja datos PII de menores (estudiantes) con restricción clave: Multi-tenant strict con auditoría real, sin fugas entre tenants. Un bug en la lógica de aplicación que olvide filtrar por `tenant_id` podría exponer datos cross-tenant. Con PII de menores es inaceptable depender solo de WHERE clauses - compliance (GDPR, COPPA equivalentes) requiere defense-in-depth.
 
 Necesitamos garantizar aislamiento incluso ante errores de implementación.
 

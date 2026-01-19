@@ -14,9 +14,10 @@ Cada 3 meses, el sistema debe sincronizar notas consolidadas con un API del gobi
 Necesitamos orquestación robusta con:
 - Reintentos con backoff exponencial
 - Rate limiting para respetar límites del API
-- Auditoría completa del proceso
-- Manejo de fallas parciales (algunos batches fallan, otros no)
-- Reconciliación para detectar discrepancias
+- **Trazabilidad completa** para auditorías gubernamentales
+- **Manejo de fallas parciales** (algunos batches fallan, otros no)  
+- **Reconciliación** para detectar discrepancias
+- **48h compliance deadline** con retry automático + manual fallback
 
 ## Decisión
 

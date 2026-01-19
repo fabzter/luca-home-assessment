@@ -11,11 +11,12 @@ El sistema tiene arquitectura distribuida:
 - DynamoDB Streams → EventBridge Pipes → Firehose → S3
 
 Necesitamos:
-- **Trazabilidad:** Seguir una request a través de todos los componentes
-- **Debugging:** Identificar dónde falló una transacción
-- **Performance analysis:** Detectar bottlenecks de latencia
-- **Alerting:** Notificaciones proactivas de errores
-- **Cost tracking:** Attribution por tenant
+- **Trazabilidad completa:** Seguir una request a través de todos los componentes para auditorías
+- **Debugging:** Identificar exactamente dónde falló una transacción cross-tenant 
+- **Performance analysis:** Detectar bottlenecks de latencia (p95 < 120ms SLA)
+- **Alerting:** Notificaciones proactivas de errores y compliance issues
+- **Audit trail completo:** CloudTrail para todas las acciones administrativas
+- **Cost tracking:** Attribution por tenant para billing
 
 ## Decisión
 

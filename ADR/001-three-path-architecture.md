@@ -4,12 +4,14 @@
 
 ## Contexto y Problema
 
-El sistema debe manejar tres tipos de operaciones con perfiles radicalmente diferentes:
-1. **Interactivas:** Consultas y escrituras síncronas (profesores/estudiantes) - p95 < 120ms
-2. **Alta velocidad:** Ingesta masiva de eventos (~5,000 RPS en picos)
-3. **Integración externa:** Sincronización trimestral con API gubernamental inestable
+El sistema educativo requiere manejar tres flujos críticos con restricciones específicas:
+1. **Evaluaciones centralizadas** - p95 < 120ms durante horario escolar (profesores registrando notas)
+2. **Perfil comportamental** - Picos 5k RPS, analytics histórico (estudiantes enviando eventos)
+3. **Sincronización trimestral** - API gubernamental inestable, 48h compliance deadline, trazabilidad total
 
-Usar una arquitectura monolítica forzaría a optimizar para el caso promedio, sacrificando eficiencia en los extremos.
+Restricción clave: Multi-tenant strict con auditoría real, sin fugas entre tenants (PII de menores).
+
+Cada patrón tiene restricciones conflictivas que hacen subóptimo un monolito único o microservicios tradicionales.
 
 ## Decisión
 

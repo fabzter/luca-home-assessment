@@ -9,10 +9,11 @@ El sistema registra evaluaciones individuales (exams, quizzes, homework) a lo la
 - Redondeo y escala de calificación
 
 Requisitos:
-- Evaluaciones se registran en tiempo real (profesores suben notas)
-- Consolidación puede tomar segundos (aplicar fórmulas complejas)
-- Lectura de perfiles debe ser <120ms p95 (precalculado)
-- Consolidación no necesita ser inmediata (eventual consistency aceptable)
+- Evaluaciones se registran en tiempo real (profesores suben notas durante clases)
+- Consolidación puede tomar segundos (aplicar fórmulas complejas por tenant)
+- Lectura de perfiles debe ser p95 < 120ms (SLA crítico) → grades precalculados
+- Consolidación no necesita ser inmediata (eventual consistency aceptable para grades)
+- **Eficiencia computacional:** Batch processing vs recalcular por cada evaluación
 
 ## Decisión
 

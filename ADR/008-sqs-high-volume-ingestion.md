@@ -4,9 +4,11 @@
 
 ## Contexto y Problema
 
-El sistema recibe eventos de comportamiento estudiantil (asistencia, participación, actividades completadas) con perfil de tráfico:
-- **Picos:** ~5,000 RPS durante clases activas (09:00-12:00)
-- **Valle:** <100 RPS durante breaks y fuera de horario
+El sistema recibe eventos de comportamiento estudiantil de ~5,000 estudiantes simultáneamente durante recreos (picos 5k RPS). **Flujo anti-stampede** debe absorber pico sin rechazar requests ni colapsar downstream:
+- Throttling en DynamoDB si golpea directamente  
+- Cold starts masivos en Lambda si escala de 0→100 instancias
+- Timeouts en API Gateway (29 segundos max)
+- **Eventual consistency aceptable** para behavior events
 - **Volumen diario:** ~10M eventos
 - **Latencia aceptable:** Eventual consistency (no necesita ser síncrono)
 

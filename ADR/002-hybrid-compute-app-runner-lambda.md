@@ -111,9 +111,12 @@ TOTAL: ~$77/mes (solo compute)
 
 ## Justificación
 
-**App Runner para Path Interactivo:**
-- Escala a cero fuera de horario (18:00-07:00 = 13hrs/día = ahorro 54%)
-- Mantiene 1 instancia caliente durante horas escolares (07:00-18:00)
+**Hybrid compute es óptimo porque:**
+
+1. **Optimización por use case:**
+   - Path 1 (Interactivo): Latencia crítica p95 <120ms → App Runner elimina cold starts
+   - Path 2 (Alta Velocidad): Picos 5k RPS → Lambda auto-scaling + SQS buffer
+   - Path 3 (Gobierno): Workflows largos + retry → Lambda en Step Functions
 - Connection pooling a DynamoDB reduce latencia en 20-30ms
 - Config cache en memoria (grading rules) evita round-trip a DB
 

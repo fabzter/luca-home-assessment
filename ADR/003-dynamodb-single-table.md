@@ -125,7 +125,7 @@ Provisioned: throttling + emergency scaling
 On-Demand: absorbe sin configuración
 ```
 
-**Por qué se descartó:** Tráfico spiky en horario escolar hace impredicible el capacity planning.
+**Por qué se descartó:** Tráfico educativo es spiky (8am-4pm), provisioned sería over o under. Capacity planning impredicible para patrones escolares.
 
 ---
 

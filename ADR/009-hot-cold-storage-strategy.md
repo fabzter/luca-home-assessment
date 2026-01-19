@@ -19,12 +19,13 @@ Storage costs:
 - S3 Standard: $0.023/GB-month (11x más barato)
 - S3 Glacier: $0.004/GB-month (62x más barato)
 
-Con 100 GB de datos, diferencia anual: $2,500 vs $276 vs $48.
+Con 500 GB de datos, diferencia anual: $1,500 vs $138 vs $24.
 
 ## Decisión
 
 **Estrategia Tiered Storage:**
 
+1. **Hot Storage (DynamoDB):** Últimos 30 días con TTL automático
 1. **Hot Storage (DynamoDB):** Últimos 30 días
    - TTL automático elimina eventos >30 días
    - Optimizado para queries por student_id

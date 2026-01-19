@@ -5,10 +5,11 @@
 ## Contexto y Problema
 
 El sistema debe mantener un data lake con historial completo de cambios para:
-- Auditoría de compliance (quién modificó qué y cuándo)
-- Análisis de tendencias (comportamiento estudiantil a lo largo del tiempo)
+- **Trazabilidad completa desde source hasta analytics** para auditorías (quién modificó qué y cuándo)
+- Análisis de tendencias (comportamiento estudiantil a lo largo del tiempo)  
 - Queries analíticos complejos (SQL sobre datos históricos)
-- Backup cold storage (retención 2+ años)
+- **Data lineage** completa para compliance reviews
+- Backup cold storage (retención 3 años compliance)
 
 DynamoDB Streams captura todos los cambios, pero necesitamos:
 - Filtrar eventos irrelevantes (solo INSERT/MODIFY, no DELETE de TTL)
