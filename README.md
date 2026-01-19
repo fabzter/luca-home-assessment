@@ -29,43 +29,43 @@ Tres flujos críticos con restricciones específicas:
 
 ```mermaid
 flowchart TB
-    subgraph Security["🔒 Seguridad Externa"]
+    subgraph Security["Seguridad Externa"]
         WAF[WAF]
         Cognito[Cognito]
         IAM[IAM Roles]
     end
     
-    subgraph Interactive["🚀 Path 1: Interactivo"]
+    subgraph Interactive["Path 1: Interactivo"]
         APIG1[API Gateway]
         AppRunner[App Runner<br/>Auto-scaling]
     end
     
-    subgraph HighVolume["📊 Path 2: Alta Velocidad"]
+    subgraph HighVolume["Path 2: Alta Velocidad"]
         APIG2[API Gateway<br/>Direct Integration]
         SQS[SQS Queue<br/>Anti-Stampede]
         ESM[Event Source<br/>Mapping]
         LambdaBatch[Lambda Workers<br/>Batch 50]
     end
     
-    subgraph Government["🏛️ Path 3: Gobierno"]
+    subgraph Government["Path 3: Gobierno"]
         EventBridge[EventBridge<br/>Trimestral]
         StepFunctions[Step Functions<br/>Standard Workflow]
         DLQ[Dead Letter<br/>Queue]
     end
     
-    subgraph Data["💾 Datos"]
+    subgraph Data["Datos"]
         DynamoDB[(DynamoDB<br/>Single Table<br/>On-Demand)]
         DDBStreams[DynamoDB<br/>Streams]
     end
     
-    subgraph Pipeline["🔄 Data Pipeline"]
+    subgraph Pipeline["Data Pipeline"]
         Pipes[EventBridge<br/>Pipes]
         Firehose[Kinesis<br/>Firehose]
         S3[(S3 Data Lake<br/>Partitioned)]
         Athena[Athena<br/>Analytics]
     end
     
-    subgraph Monitoring["📈 Observabilidad"]
+    subgraph Monitoring["Observabilidad"]
         CloudWatch[CloudWatch<br/>Logs + Metrics]
         XRay[X-Ray<br/>Tracing]
         CloudTrail[CloudTrail<br/>Audit]
@@ -113,7 +113,7 @@ Cada escenario demuestra las decisiones clave de latencia, seguridad, y operaci�
 
 ```mermaid
 flowchart LR
-    Prof[👩‍🏫 Profesora] -->|JWT school_id=123| WAF[WAF]
+    Prof[Profesora] -->|JWT school_id=123| WAF[WAF]
     WAF -->|DDoS + Rate Check| APIG[API Gateway]
     APIG -->|Validate JWT| AppRunner[App Runner<br/>Container Pool]
     AppRunner -->|Cached Config<br/>TCP Pool| DDB[(DynamoDB)]
@@ -150,7 +150,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Students[👨‍🎓 5k Estudiantes] -->|POST /behavior| APIG2[API Gateway<br/>Direct Integration]
+    Students[5k Estudiantes] -->|POST /behavior| APIG2[API Gateway<br/>Direct Integration]
     APIG2 -->|SendMessage<br/>No Lambda| SQS[SQS Queue<br/>Anti-Stampede]
     SQS -->|202 Accepted<br/>2ms| Students
     
@@ -219,6 +219,13 @@ stateDiagram-v2
 - **Reconciliación:** Lambda final verifica que gobierno recibió todos los grades vs base local
 - **Auditoría:** Step Functions execution history + CloudTrail = trazabilidad completa
 
+**Decisiones de resilience/traceability:**
+- **Exponential backoff:** 5s → 15s → 45s ante 503s del API gobierno
+- **Circuit breaker:** Stop después 3 fallos, evita hammer inútil
+- **Dead letter queue:** Batches problemáticos para analysis manual
+- **Checkpointing:** S3 state permite reiniciar desde fallo exacto
+- **Audit completo:** Step Functions execution history proporciona trazabilidad completa para auditorías gubernamentales
+
 **Operación (Step Functions son visibles en AWS Console):**
 - **Visual debugging:** AWS Step Functions Console → Execution History tab muestra exactamente qué batch falló y cuándo
 - **State machine definition:** JSON visible en Definition tab, editable via Code/Visual editor
@@ -253,6 +260,7 @@ flowchart LR
 **Multi-tenant security:**
 - **Data isolation:** S3 partitioned by school_id, IAM policies enforce access
 - **Retention:** TTL automático en hot data, cold data retained 3 años compliance
+- **Data lineage:** DynamoDB Streams → EventBridge Pipes → S3 pipeline proporciona trazabilidad completa desde source hasta analytics para auditorías
 
 **Trade-off:** All DynamoDB vs Hot/Cold → operational complexity pero massive cost savings
 
@@ -320,37 +328,42 @@ WARNING: Error rate > 0.5%
 WARNING: DynamoDB consumed capacity > 80%
 ```
 
+**Explicabilidad y Compliance:**
+- **CloudTrail:** Audit trail completo de todas las acciones administrativas para compliance reviews
+- **X-Ray Tracing:** Distributed tracing permite identificar exactamente dónde falló una transacción cross-tenant
+
 ### **Runbook Incidentes**
 
-**📈 High Latency (Path 1):**
+**High Latency (Path 1):**
 *AWS Path: Cognito → API Gateway → App Runner → DynamoDB*
 1. Check App Runner CPU/Memory → Scale up instances
 2. Check DynamoDB throttling → Review capacity or switch to provisioned
 3. Check downstream dependencies (Cognito, IAM)
 
-**🔥 High Queue Depth (Path 2):**
+**High Queue Depth (Path 2):**
 *AWS Path: API Gateway → SQS → Lambda → DynamoDB*
 1. Check Lambda errors → Fix code issues
 2. Check DynamoDB throttling → Increase WCU or switch provisioned
 3. Temporary: Scale Lambda concurrency manually
 
-**❌ Government Sync Failed (Path 3):**
+**Government Sync Failed (Path 3):**
 *AWS Path: EventBridge → Step Functions → Lambda → External API*
 1. Check Step Function execution history → Identify failed step
 2. If API timeout → Manual retry after government maintenance
 3. If data validation → Check DLQ, fix data, replay
 
-**🚨 Multi-tenant Data Leak:**
+**Multi-tenant Data Leak:**
 *AWS Components: IAM Roles/Policies + DynamoDB LeadingKeys (affects all paths)*
 1. STOP: Disable affected IAM role immediately
 2. Check CloudTrail logs for unauthorized access
 3. Audit affected tenants, notify if breach confirmed
 4. Root cause: Review IAM policy, fix, re-deploy
 
-**💾 DynamoDB Issues:**
+**DynamoDB Issues:**
 *AWS Component: DynamoDB (shared by all 3 paths)*
 1. Check CloudWatch metrics (throttles, errors)
 2. On-demand should auto-scale → Check for hot partitions
 3. If persistent → Consider GSI or data model changes
 
 ---
+
