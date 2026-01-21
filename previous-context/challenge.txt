@@ -1,0 +1,30 @@
+Objetivo
+
+Quiero ver cómo piensas y comunicas un diseño de sistemas distribuidos en cloud bajo presión real: alto tráfico, baja latencia, multi-rol, multi-tenant, integraciones externas y operación.
+
+Entregable principal: Diseño + diagramas.
+Código/PoC: opcional.
+Diseña un sistema con 3 piezas:
+Notas centralizadas - Se registran evaluaciones y se calcula una nota consolidada por periodo (reglas configurables por tenant).
+Sincronización trimestral con un API del gobierno - Cada 3 meses se envía un corte. El API externo puede aceptar, rechazar o corregir. Tú defines estrategia de idempotencia, rate limits, reintentos, DLQ y reconciliación.
+Perfil de comportamiento por estudiante - Con eventos/actividades se construye un perfil útil para personalización 1:1. Algunas señales son casi real-time, otras batch. Quiero ver cómo planteas pipeline, storage, serving, y mínimos de explicabilidad y privacidad.
+Restricciones
+Lectura en sesión 1:1: p95 < 120ms, p99 < 250ms para traer perfil + nota consolidada.
+Eventos: picos altos (decide tú cómo modelar y absorberlo sin caerte).
+Sync trimestral: debe terminar en 48h y dejar trazabilidad completa.
+Multi-tenant + RBAC: sin fugas entre tenants. Auditoría real.
+Diseño
+Usa la herramienta de tu preferencia - que incluya:
+Arquitectura + diagrama (componentes y flujos: write/read/sync).
+Decisiones clave para latencia/escala (cache, read models, colas/eventbus, anti-stampede, límites/timeout).
+Integración gobierno (idempotencia, rate limiting, reintentos, reconciliación, auditoría).
+Multi-tenant + seguridad (aislamiento, RBAC, PII/logs, retención/borrado).
+Operación (métricas/alertas mínimas + cómo respondes a incidentes).
+Tradeoffs explícitos (alternativas y por qué elegiste tu ruta).
+
+Eso es todo. Prefiero una página clara a 5 páginas “bonitas”.
+Opcional (si te sobra tiempo)
+Un archivo de PoC que demuestre una idea crítica (single flight anti-stampede, idempotencia, rate limiting multi-tenant, worker de sync con DLQ, etc.). No necesito un sistema completo.
+Cómo lo evaluamos
+
+Claridad + criterio.
